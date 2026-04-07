@@ -1,0 +1,53 @@
+.defaultBtn {
+  padding: 10px 20px;
+  background-color: var(--primary-color);
+  border: 1px solid var(--secondary-color);
+  transition: all 0.3s;
+  color: var(--white-color);
+  width: 100%;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+
+.defaultBtn:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--primary-color);
+  color: var(--white-color);
+}
+
+.secondaryBtn {
+  padding: 10px 20px;
+  background-color: var(--gray);
+  border: 1px solid var(--gray-hover);
+  transition: all 0.3s;
+  color: var(--text-color);
+  width: 100%;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+
+.secondaryBtn:hover {
+  background-color: var(--gray-hover);
+  border-color: var(--gray-hover);
+  color: var(--white-color);
+}
+
+.dangerBtn {
+  padding: 10px 20px;
+  background-color: var(--error-color);
+  border: 1px solid var(--error-color);
+  transition: all 0.3s;
+  color: var(--white-color);
+  width: 100%;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+
+.dangerBtn:hover {
+  background-color: var(--error-hover);
+  border-color: var(--error-hover);
+  color: var(--white-color);
+}

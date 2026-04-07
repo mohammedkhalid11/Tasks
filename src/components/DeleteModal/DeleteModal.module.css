@@ -1,0 +1,39 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--white-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  min-width: 280px;
+  max-width: 90vw;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+  color: var(--primary-color);
+}
+
+.message {
+  margin: 0 0 1.25rem;
+  color: #4a5568;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.autoWidth {
+  width: auto;
+}
