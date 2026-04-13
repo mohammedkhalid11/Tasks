@@ -22,10 +22,10 @@ const Login = () => {
 
   const onSubmit =async (data) => {
     try {
-      const response = await login (data)
+      const response = await login(data);
       console.log(response)
-      localStorage.setltme("token", response.token)
-      navigate("/genres")
+      localStorage.setItem("token", response.token)
+      navigate("/dashboard")
     } catch (error){
       console.error("Error during login:",error)
     }
