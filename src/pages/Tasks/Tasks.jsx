@@ -1,61 +1,175 @@
 ﻿import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { tasks as mockTasks, projects as mockProjects, priorities as mockPriorities, today } from '../../data/mockData';
 import styles from './Tasks.module.css';
+import {
+  createTask,
+  deleteTask as deleteTaskRequest,
+  getTasks,
+  updateTask,
+} from '../../services/TasksService';
+import { getProjects } from '../../services/ProjectsService';
+import { getPriorities } from '../../services/PrioritiesService';
+
+const today = new Date().toISOString().split('T')[0];
+
+const toInputDate = (value) => {
+  if (!value) return today;
+  return String(value).split('T')[0];
+};
+
+const toBackendDateTime = (dateValue) => {
+  if (!dateValue) return '';
+  return `${dateValue}T00:00:00`;
+};
+
+const normalizeProject = (item) => ({
+  id: item.id ?? item.project_id,
+  name: item.name ?? '',
+  description: item.description ?? '',
+  createdAt: toInputDate(item.createdAt ?? item.created_at),
+});
+
+const normalizePriority = (item) => ({
+  id: item.id ?? item.priority_id,
+  name: item.name ?? '',
+  reminderTime: item.reminderTime ?? item.reminder_time ?? '',
+  createdAt: toInputDate(item.createdAt ?? item.created_at),
+});
+
+const normalizeTask = (item) => ({
+  id: item.id ?? item.task_id,
+  title: item.title ?? '',
+  description: item.description ?? '',
+  status: item.status ?? 'pending',
+  duDate: toInputDate(item.duDate ?? item.dueDate ?? item.due_date),
+  createdAt: toInputDate(item.createdAt ?? item.created_at),
+  projectId: Number(item.projectId ?? item.project_id ?? item.project?.id ?? 0),
+  priorityId: Number(item.priorityId ?? item.priority_id ?? item.priority?.id ?? 0),
+  project: item.project ? normalizeProject(item.project) : null,
+  priority: item.priority ? normalizePriority(item.priority) : null,
+});
+
+const toArray = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  return [];
+};
 
 const Tasks = () => {
-  const [tasks, setTasks] = useState(mockTasks);
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [priorities, setPriorities] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { register, handleSubmit, reset, formState: { errors } } = useForm({ defaultValues: {} });
+
+  const fetchPageData = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const [tasksResponse, projectsResponse, prioritiesResponse] = await Promise.all([
+        getTasks(),
+        getProjects(),
+        getPriorities(),
+      ]);
+
+      setTasks(toArray(tasksResponse).map(normalizeTask));
+      setProjects(toArray(projectsResponse).map(normalizeProject));
+      setPriorities(toArray(prioritiesResponse).map(normalizePriority));
+    } catch (error) {
+      console.error('Error loading tasks page data:', error);
+      setError('Failed to load tasks data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPageData();
+  }, []);
 
   useEffect(() => {
     reset(editing || {
       title: '',
       description: '',
       status: 'pending',
-      due_date: today,
-      project_id: '',
-      priority_id: '',
-      created_at: today,
+      duDate: today,
+      projectId: '',
+      priorityId: '',
+      createdAt: today,
     });
   }, [editing, reset]);
 
-  const saveTask = (data) => {
+  const saveTask = async (data) => {
+    setError('');
+
+    const selectedProject = projects.find((project) => project.id === Number(data.projectId));
+    const selectedPriority = priorities.find((priority) => priority.id === Number(data.priorityId));
+
     const payload = {
-      ...data,
-      project_id: Number(data.project_id),
-      priority_id: Number(data.priority_id),
+      id: editing?.id ?? 0,
+      title: data.title,
+      description: data.description || '',
+      status: data.status,
+      duDate: toBackendDateTime(data.duDate),
+      createdAt: toBackendDateTime(data.createdAt),
+      projectId: Number(data.projectId),
+      project: {
+        id: selectedProject?.id ?? Number(data.projectId),
+        name: selectedProject?.name ?? '',
+        description: selectedProject?.description ?? '',
+        createdAt: toBackendDateTime(selectedProject?.createdAt || data.createdAt),
+      },
+      priorityId: Number(data.priorityId),
+      priority: {
+        id: selectedPriority?.id ?? Number(data.priorityId),
+        name: selectedPriority?.name ?? '',
+        reminderTime: selectedPriority?.reminderTime || toBackendDateTime(data.createdAt),
+        createdAt: toBackendDateTime(selectedPriority?.createdAt || data.createdAt),
+      },
     };
 
-    if (editing) {
-      setTasks((prev) => prev.map((item) => (item.task_id === editing.task_id ? { ...item, ...payload } : item)));
-    } else {
-      setTasks((prev) => [
-        ...prev,
-        {
-          ...payload,
-          task_id: prev.length ? Math.max(...prev.map((item) => item.task_id)) + 1 : 1,
-        },
-      ]);
-    }
+    try {
+      if (editing) {
+        await updateTask(editing.id, payload);
+      } else {
+        await createTask(payload);
+      }
 
-    setEditing(null);
-    reset({
-      title: '',
-      description: '',
-      status: 'pending',
-      due_date: today,
-      project_id: '',
-      priority_id: '',
-      created_at: today,
-    });
+      await fetchPageData();
+      setEditing(null);
+      reset({
+        title: '',
+        description: '',
+        status: 'pending',
+        duDate: today,
+        projectId: '',
+        priorityId: '',
+        createdAt: today,
+      });
+    } catch (error) {
+      console.error('Error saving task:', error);
+      setError('Failed to save task');
+    }
   };
 
   const editTask = (task) => setEditing(task);
 
-  const deleteTask = (id) => {
-    setTasks((prev) => prev.filter((task) => task.task_id !== id));
-    if (editing?.task_id === id) setEditing(null);
+  const deleteTask = async (id) => {
+    setError('');
+    try {
+      await deleteTaskRequest(id);
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+      if (editing?.id === id) {
+        setEditing(null);
+        reset({ title: '', description: '', status: 'pending', duDate: today, projectId: '', priorityId: '', createdAt: today });
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      setError('Failed to delete task');
+    }
   };
 
   return (
@@ -64,6 +178,7 @@ const Tasks = () => {
       <div className={styles.wrapper}>
         <form className={styles.form} onSubmit={handleSubmit(saveTask)}>
           <h2>{editing ? 'Edit Task' : 'New Task'}</h2>
+          {error && <span className={styles.error}>{error}</span>}
           <label>
             Title
             <input {...register('title', { required: true })} />
@@ -84,37 +199,37 @@ const Tasks = () => {
           </label>
           <label>
             Due Date
-            <input type="date" {...register('due_date', { required: true })} />
-            {errors.due_date && <span className={styles.error}>Due date required</span>}
+            <input type="date" {...register('duDate', { required: true })} />
+            {errors.duDate && <span className={styles.error}>Due date required</span>}
           </label>
           <label>
             Project
-            <select {...register('project_id', { required: true })}>
+            <select {...register('projectId', { required: true })}>
               <option value="">Select project</option>
-              {mockProjects.map((project) => (
-                <option key={project.project_id} value={project.project_id}>{project.name}</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.name}</option>
               ))}
             </select>
-            {errors.project_id && <span className={styles.error}>Project required</span>}
+            {errors.projectId && <span className={styles.error}>Project required</span>}
           </label>
           <label>
             Priority
-            <select {...register('priority_id', { required: true })}>
+            <select {...register('priorityId', { required: true })}>
               <option value="">Select priority</option>
-              {mockPriorities.map((priority) => (
-                <option key={priority.priority_id} value={priority.priority_id}>{priority.name}</option>
+              {priorities.map((priority) => (
+                <option key={priority.id} value={priority.id}>{priority.name}</option>
               ))}
             </select>
-            {errors.priority_id && <span className={styles.error}>Priority required</span>}
+            {errors.priorityId && <span className={styles.error}>Priority required</span>}
           </label>
           <label>
             Created At
-            <input type="date" {...register('created_at', { required: true })} />
-            {errors.created_at && <span className={styles.error}>Date required</span>}
+            <input type="date" {...register('createdAt', { required: true })} />
+            {errors.createdAt && <span className={styles.error}>Date required</span>}
           </label>
           <div className={styles.buttons}>
             <button type="submit">Save</button>
-            <button type="button" onClick={() => { setEditing(null); reset({ title: '', description: '', status: 'pending', due_date: today, project_id: '', priority_id: '', created_at: today }); }}>Cancel</button>
+            <button type="button" onClick={() => { setEditing(null); reset({ title: '', description: '', status: 'pending', duDate: today, projectId: '', priorityId: '', createdAt: today }); }}>Cancel</button>
           </div>
         </form>
         <div className={styles.tableWrapper}>
@@ -131,20 +246,30 @@ const Tasks = () => {
               </tr>
             </thead>
             <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan="7">Loading tasks...</td>
+                </tr>
+              )}
+              {!loading && tasks.length === 0 && (
+                <tr>
+                  <td colSpan="7">No tasks found</td>
+                </tr>
+              )}
               {tasks.map((task) => {
-                const project = mockProjects.find((item) => item.project_id === task.project_id);
-                const priority = mockPriorities.find((item) => item.priority_id === task.priority_id);
+                const project = task.project || projects.find((item) => item.id === task.projectId);
+                const priority = task.priority || priorities.find((item) => item.id === task.priorityId);
                 return (
-                  <tr key={task.task_id}>
-                    <td>{task.task_id}</td>
+                  <tr key={task.id}>
+                    <td>{task.id}</td>
                     <td>{task.title}</td>
                     <td>{task.status}</td>
                     <td>{project?.name || 'N/A'}</td>
                     <td>{priority?.name || 'N/A'}</td>
-                    <td>{task.due_date}</td>
+                    <td>{task.duDate}</td>
                     <td className={styles.actions}>
                       <button onClick={() => editTask(task)}>Edit</button>
-                      <button onClick={() => deleteTask(task.task_id)}>Delete</button>
+                      <button onClick={() => deleteTask(task.id)}>Delete</button>
                     </td>
                   </tr>
                 );

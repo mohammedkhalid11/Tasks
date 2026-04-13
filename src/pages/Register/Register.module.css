@@ -103,3 +103,10 @@
   color: var(--secondary-color);
   text-decoration: underline;
 }
+
+.submitError {
+  margin: -0.5rem 0 0;
+  color: #dc2626;
+  font-size: 0.9rem;
+  text-align: center;
+}

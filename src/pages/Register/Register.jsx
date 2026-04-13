@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import FormModel from "../../components/FormModel/FormModel"
@@ -5,11 +6,12 @@ import Input from "../../components/Input/Input"
 import Button from "../../components/Button/Button"
 import { RegisterSchema } from "./Register.Schema"
 import styles from "./Register.module.css"
+import { registerUser } from "../../services/RegisterService"
 
-// import{Register}from"../../services/RegisterService"
 import {useNavigate,Link}from"react-router"
 const Register = () => {
   const navigate =useNavigate()
+  const [submitError, setSubmitError] = useState("")
   const {
 
     register,
@@ -18,18 +20,17 @@ const Register = () => {
   } = useForm({
     resolver: zodResolver(RegisterSchema),
     mode: "all",
-    defaultValues: { name: "", phone: "", email: "", password: "" },
+    defaultValues: { firstName: "", lastName: "", username: "", email: "", password: "" },
   })
 
   const onSubmit =async (data) => {
     try {
-        console.log(data)   
-    //   const response = await Register (data)
-    //   console.log(response)
-    //   localStorage.setltme("token", response.token)
-      navigate("/genres")
+      setSubmitError("")
+      await registerUser(data)
+      navigate("/")
     } catch (error){
       console.error("Error during Register:",error)
+      setSubmitError("فشل إنشاء الحساب، تحقق من البيانات أو جرّب مرة أخرى")
     }
   }
 
@@ -47,18 +48,25 @@ const Register = () => {
       <FormModel>
         <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
           <Input
-            label="الاسم الكامل"
+            label="الاسم الأول"
             type="text"
-            placeholder="أدخل اسمك الكامل"
-            error={errors.name?.message}
-            {...register("name")}
+            placeholder="أدخل الاسم الأول"
+            error={errors.firstName?.message}
+            {...register("firstName")}
           />
           <Input
-            label="رقم الهاتف"
+            label="اسم العائلة"
             type="text"
-            placeholder="أدخل رقم هاتفك"
-            error={errors.phone?.message}
-            {...register("phone")}
+            placeholder="أدخل اسم العائلة"
+            error={errors.lastName?.message}
+            {...register("lastName")}
+          />
+          <Input
+            label="اسم المستخدم"
+            type="text"
+            placeholder="أدخل اسم المستخدم"
+            error={errors.username?.message}
+            {...register("username")}
           />
           <Input
             label="البريد الإلكتروني"
@@ -74,12 +82,13 @@ const Register = () => {
             error={errors.password?.message}
             {...register("password")}
           />
+          {submitError && <p className={styles.submitError}>{submitError}</p>}
           <Button 
             type="submit" 
             text={isSubmitting ? "جاري التسجيل..." : "انشاء حساب"} 
             disabled={isSubmitting} 
           />
-           <div className={styles.link}><Link to="/login">لديك حساب بالفعل؟ سجل دخولك</Link></div>
+           <div className={styles.link}><Link to="/">لديك حساب بالفعل؟ سجل دخولك</Link></div>
         </form>
       </FormModel>
     </section>

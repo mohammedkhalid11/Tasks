@@ -1,41 +1,105 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { today, users as mockUsers, projects as mockProjects } from '../../data/mockData';
 import styles from './Projects.module.css';
+import {
+  createProject,
+  deleteProject as deleteProjectRequest,
+  getProjects,
+  updateProject,
+} from '../../services/ProjectsService';
+
+const today = new Date().toISOString().split('T')[0];
+
+const toInputDate = (value) => {
+  if (!value) return today;
+  return String(value).split('T')[0];
+};
+
+const normalizeProject = (project) => ({
+  id: project.id ?? project.project_id,
+  name: project.name ?? '',
+  description: project.description ?? '',
+  createdAt: toInputDate(project.createdAt ?? project.created_at),
+});
+
+const getProjectsArray = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  return [];
+};
 
 const Projects = () => {
-  const [projects, setProjects] = useState(mockProjects);
+  const [projects, setProjects] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { register, handleSubmit, reset, formState: { errors } } = useForm({ defaultValues: {} });
 
+  const fetchProjects = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await getProjects();
+      const data = getProjectsArray(response).map(normalizeProject);
+      setProjects(data);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setError('Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    reset(editing || { name: '', description: '', owner_id: '', created_at: today });
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    reset(editing || { name: '', description: '', createdAt: today });
   }, [editing, reset]);
 
-  const saveProject = (data) => {
-    if (editing) {
-      setProjects((prev) => prev.map((item) => item.project_id === editing.project_id ? { ...item, ...data, owner_id: Number(data.owner_id) } : item));
-    } else {
-      setProjects((prev) => [
-        ...prev,
-        {
-          ...data,
-          project_id: prev.length ? Math.max(...prev.map((item) => item.project_id)) + 1 : 1,
-          owner_id: Number(data.owner_id),
-        },
-      ]);
+  const saveProject = async (data) => {
+    setError('');
+    const payload = {
+      id: editing?.id ?? 0,
+      name: data.name,
+      description: data.description || '',
+      createdAt: data.createdAt,
+    };
+
+    try {
+      if (editing) {
+        await updateProject(editing.id, payload);
+      } else {
+        await createProject(payload);
+      }
+
+      await fetchProjects();
+      setEditing(null);
+      reset({ name: '', description: '', createdAt: today });
+    } catch (error) {
+      console.error('Error saving project:', error);
+      setError('Failed to save project');
     }
-    setEditing(null);
-    reset({ name: '', description: '', owner_id: '', created_at: today });
   };
 
   const editProject = (project) => {
     setEditing(project);
   };
 
-  const deleteProject = (id) => {
-    setProjects((prev) => prev.filter((item) => item.project_id !== id));
-    if (editing?.project_id === id) setEditing(null);
+  const deleteProject = async (id) => {
+    setError('');
+    try {
+      await deleteProjectRequest(id);
+      setProjects((prev) => prev.filter((item) => item.id !== id));
+      if (editing?.id === id) {
+        setEditing(null);
+        reset({ name: '', description: '', createdAt: today });
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      setError('Failed to delete project');
+    }
   };
 
   return (
@@ -44,6 +108,7 @@ const Projects = () => {
       <div className={styles.wrapper}>
         <form className={styles.form} onSubmit={handleSubmit(saveProject)}>
           <h2>{editing ? 'Edit Project' : 'New Project'}</h2>
+          {error && <span className={styles.error}>{error}</span>}
           <label>
             Name
             <input {...register('name', { required: true })} />
@@ -54,23 +119,13 @@ const Projects = () => {
             <textarea {...register('description')} />
           </label>
           <label>
-            Owner
-            <select {...register('owner_id', { required: true })}>
-              <option value="">Select owner</option>
-              {mockUsers.map((user) => (
-                <option key={user.user_id} value={user.user_id}>{user.username}</option>
-              ))}
-            </select>
-            {errors.owner_id && <span className={styles.error}>Owner required</span>}
-          </label>
-          <label>
             Created At
-            <input type="date" {...register('created_at', { required: true })} />
-            {errors.created_at && <span className={styles.error}>Date required</span>}
+            <input type="date" {...register('createdAt', { required: true })} />
+            {errors.createdAt && <span className={styles.error}>Date required</span>}
           </label>
           <div className={styles.buttons}>
             <button type="submit">Save</button>
-            <button type="button" onClick={() => { setEditing(null); reset({ name: '', description: '', owner_id: '', created_at: today }); }}>Cancel</button>
+            <button type="button" onClick={() => { setEditing(null); reset({ name: '', description: '', createdAt: today }); }}>Cancel</button>
           </div>
         </form>
         <div className={styles.tableWrapper}>
@@ -79,23 +134,30 @@ const Projects = () => {
               <tr>
                 <th>ID</th>
                 <th>Name</th>
-                <th>Owner</th>
                 <th>Created At</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan="4">Loading projects...</td>
+                </tr>
+              )}
+              {!loading && projects.length === 0 && (
+                <tr>
+                  <td colSpan="4">No projects found</td>
+                </tr>
+              )}
               {projects.map((project) => {
-                const owner = mockUsers.find((user) => user.user_id === project.owner_id);
                 return (
-                  <tr key={project.project_id}>
-                    <td>{project.project_id}</td>
+                  <tr key={project.id}>
+                    <td>{project.id}</td>
                     <td>{project.name}</td>
-                    <td>{owner?.username || 'N/A'}</td>
-                    <td>{project.created_at}</td>
+                    <td>{project.createdAt}</td>
                     <td className={styles.actions}>
                       <button onClick={() => editProject(project)}>Edit</button>
-                      <button onClick={() => deleteProject(project.project_id)}>Delete</button>
+                      <button onClick={() => deleteProject(project.id)}>Delete</button>
                     </td>
                   </tr>
                 );
