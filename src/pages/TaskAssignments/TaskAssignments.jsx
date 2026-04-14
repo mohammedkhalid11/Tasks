@@ -101,7 +101,7 @@ const TaskAssignments = () => {
     setError('');
 
     const selectedTask = tasks.find((task) => task.id === Number(data.taskId));
-    const selectedUser = users.find((user) => user.id === Number(data.userId));
+    const selectedUser = users.find((user) => String(user.id) === String(data.userId));
 
     const payload = {
       id: editing?.id ?? 0,
@@ -118,7 +118,7 @@ const TaskAssignments = () => {
         priorityId: selectedTask?.priorityId ?? 0,
         priority: selectedTask?.priority ?? null,
       },
-      userId: Number(data.userId),
+      userId: data.userId,
       user: selectedUser || null,
     };
 

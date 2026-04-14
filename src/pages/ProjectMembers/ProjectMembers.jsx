@@ -93,7 +93,7 @@ const ProjectMembers = () => {
     setError('');
 
     const selectedProject = projects.find((project) => project.id === Number(data.projectId));
-    const selectedUser = users.find((user) => user.id === Number(data.userId));
+    const selectedUser = users.find((user) => String(user.id) === String(data.userId));
 
     const payload = {
       id: editing?.id ?? 0,
@@ -104,7 +104,7 @@ const ProjectMembers = () => {
         description: selectedProject?.description ?? '',
         createdAt: toBackendDateTime(selectedProject?.createdAt),
       },
-      userId: Number(data.userId),
+      userId: data.userId,
       user: selectedUser || null,
     };
 
